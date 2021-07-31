@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+
+  web:
+    build:
+      context: ./
+      dockerfile: ./web/Dockerfile
+    environment:
+      TZ: 'Asia/Tokyo'
+    ports:
+      - 8000:8000
+    volumes:
+      - ./nginx/logs/nginx/:/var/log/nginx/
+      - ./nginx/uwsgi_params:/etc/nginx/uwsgi_params
+      - ./back/static:/var/www/static/
+    depends_on:
+      - back
+
+  redis:
+    image: redis:alpine
+    expose:
+      - "6379"
+
+  db:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD
+      - MYSQL_ROOT_HOST
+    volumes:
+      - ./db/db-datadir:/var/lib/mysql
+      - ./db/init.d:/docker-entrypoint-initdb.d
+      - ./db/work/my.cnf:/etc/mysql/my.cnf
+
+  crawler:
+    build:
+      context: ./crawler
+      dockerfile: Dockerfile
+    command: 'sh /server/start-back.sh'
+    env_file: ./back/local.env
+    environment:
+      - LOCAL_URL_8000=http://localhost:8000
+      - LOCAL_URL_8080=http://localhost:8080
+    expose:
+      - "8001"
+      - "3001"
+    volumes:
+      - ./clawler:/server/
+    depends_on:
+      - db
+      - redis
